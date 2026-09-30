@@ -1,0 +1,34 @@
+spring.application.name: tab
+
+server:
+    port: 8080
+
+spring:
+    datasource:
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        # 将 localhost 替换为你的 ECS 公网 IP 或 RDS 外网连接地址
+        url: jdbc:mysql://112.74.85.212:3306/nav_site?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+        username: root # 你的阿里云数据库用户名
+        password: ww11 # 你的阿里云数据库密码
+
+# MyBatis-Plus 配置
+mybatis-plus:
+    configuration:
+        log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 开启 SQL 打印，调试很方便
+        map-underscore-to-camel-case: true # 下划线自动转驼峰
+    global-config:
+        db-config:
+            logic-delete-field: deleted # 逻辑删除字段（可选）
+
+# Sa-Token 配置
+sa-token:
+    # token 名称 (同时也是 cookie 名称)
+    token-name: satoken
+    # token 有效期，单位秒 ( -1 代表永不过期 )
+    timeout: 2592000
+    # token 临时有效期 (指定时间内无操作就视为 Token 过期) 单位秒
+    active-timeout: -1
+    # 是否尝试从 cookie 中读取 token
+    is-read-cookie: false
+    # 是否控制台打印 log
+    is-log: true
