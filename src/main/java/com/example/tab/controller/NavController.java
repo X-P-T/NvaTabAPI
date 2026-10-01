@@ -4,8 +4,7 @@ import com.example.tab.model.entity.Category;
 import com.example.tab.model.entity.Site;
 import com.example.tab.model.vo.CategoryWithSitesVO;
 import com.example.tab.service.NavService;
-import com.example.tab.mapper.CategoryMapper;
-// import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,37 +13,39 @@ import java.util.List;
 @RequestMapping("/api/nav")
 public class NavController {
 
-    private final NavService navService;
-
-    private final CategoryMapper categoryMapper;
-
-    public NavController(NavService navService, CategoryMapper categoryMapper) {
-        this.navService = navService;
-        this.categoryMapper = categoryMapper;
-    }
+    @Autowired
+    private NavService navService;
 
     /**
-     * 获取完整导航树数据（首页渲染专用）
+     * 查询导航树 (公开接口，所有人均可访问)
      * GET /api/nav/tree
+     * GET /api/nav/tree?userId=1 (查指定作者)
      */
     @GetMapping("/tree")
-    public List<CategoryWithSitesVO> getNavTree() {
-        return navService.getNavTree();
+    public List<CategoryWithSitesVO> getNavTree(@RequestParam(required = false) Long userId) {
+        return navService.getNavTree(userId);
     }
 
     /**
-     * 新增分类
-     * POST /api/nav/category
+     * 新增分类 (需携带 Token 认证)
      */
     @PostMapping("/category")
     public String addCategory(@RequestBody Category category) {
-        categoryMapper.insert(category);
+        navService.addCategory(category);
         return "新增分类成功";
     }
 
     /**
-     * 新增网址卡片
-     * POST /api/nav/site
+     * 删除分类 (需携带 Token 认证且必须是自己的数据)
+     */
+    @DeleteMapping("/category/{id}")
+    public String deleteCategory(@PathVariable Long id) {
+        navService.deleteCategory(id);
+        return "删除分类成功";
+    }
+
+    /**
+     * 新增网址 (需携带 Token 认证)
      */
     @PostMapping("/site")
     public String addSite(@RequestBody Site site) {
@@ -53,12 +54,20 @@ public class NavController {
     }
 
     /**
-     * 累加网址点击量
-     * POST /api/nav/site/click/{id}
+     * 删除网址 (需携带 Token 认证且必须是自己的数据)
+     */
+    @DeleteMapping("/site/{id}")
+    public String deleteSite(@PathVariable Long id) {
+        navService.deleteSite(id);
+        return "删除网址成功";
+    }
+
+    /**
+     * 记录网址点击量 (公开接口，所有人可触发)
      */
     @PostMapping("/site/click/{id}")
-    public String clickSite(@PathVariable("id") Long id) {
+    public String incrementClick(@PathVariable Long id) {
         navService.incrementClick(id);
-        return "OK";
+        return "计数成功";
     }
 }

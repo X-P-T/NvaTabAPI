@@ -2,11 +2,11 @@ package com.example.tab.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.example.tab.model.dto.AuthDTO;
+import com.example.tab.model.entity.User;
 import com.example.tab.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -34,13 +34,7 @@ public class AuthController {
     }
 
     @GetMapping("/info")
-    public Map<String, Object> getUserInfo() {
-        // 确保已登录
-        StpUtil.checkLogin();
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("userId", StpUtil.getLoginIdAsLong());
-        result.put("isLogin", StpUtil.isLogin());
-        return result;
+    public User getUserInfo() {
+        return userService.getCurrentUserInfo();
     }
 }

@@ -6,6 +6,7 @@ import com.example.tab.mapper.UserMapper;
 import com.example.tab.model.dto.AuthDTO;
 import com.example.tab.model.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -18,21 +19,23 @@ public class UserService {
     @Autowired
     private UserMapper userMapper;
 
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+
     /**
-     * 用户注册
+     * 用户注册（BCrypt 密码加密存储）
      */
     public void register(AuthDTO dto) {
-        // 1. 检查用户名是否存在
         LambdaQueryWrapper<User> query = new LambdaQueryWrapper<>();
         query.eq(User::getUsername, dto.getUsername());
         if (userMapper.selectCount(query) > 0) {
             throw new RuntimeException("用户名已存在");
         }
 
-        // 2. 保存用户 (实际项目中可进行 MD5/BCrypt 密码加密)
         User user = new User();
         user.setUsername(dto.getUsername());
-        user.setPassword(dto.getPassword());
+        // 使用 BCrypt 对原始密码进行哈希加密
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
         user.setNickname(dto.getNickname() != null ? dto.getNickname() : dto.getUsername());
         user.setStatus(1);
         user.setCreateTime(LocalDateTime.now());
@@ -41,15 +44,14 @@ public class UserService {
     }
 
     /**
-     * 用户登录，返回 token 信息
+     * 用户登录（BCrypt 密文比对）
      */
     public Map<String, Object> login(AuthDTO dto) {
-        // 1. 查询用户
         LambdaQueryWrapper<User> query = new LambdaQueryWrapper<>();
         query.eq(User::getUsername, dto.getUsername());
         User user = userMapper.selectOne(query);
 
-        if (user == null || !user.getPassword().equals(dto.getPassword())) {
+        if (user == null || !passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
             throw new RuntimeException("用户名或密码错误");
         }
 
@@ -57,10 +59,8 @@ public class UserService {
             throw new RuntimeException("账号已被冻结");
         }
 
-        // 2. Sa-Token 登录 (传入 userId)
         StpUtil.login(user.getId());
 
-        // 3. 组装返回结果
         Map<String, Object> result = new HashMap<>();
         result.put("tokenName", StpUtil.getTokenName());
         result.put("tokenValue", StpUtil.getTokenValue());
@@ -69,5 +69,17 @@ public class UserService {
         result.put("nickname", user.getNickname());
 
         return result;
+    }
+
+    /**
+     * 获取当前登录用户信息
+     */
+    public User getCurrentUserInfo() {
+        Long userId = StpUtil.getLoginIdAsLong();
+        User user = userMapper.selectById(userId);
+        if (user != null) {
+            user.setPassword(null); // 脱敏，不把密码返回给前端
+        }
+        return user;
     }
 }

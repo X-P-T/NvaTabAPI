@@ -11,6 +11,12 @@ spring:
         username: root # 你的阿里云数据库用户名
         password: ww11 # 你的阿里云数据库密码
 
+    web:
+        resources:
+            # 禁用默认的静态资源映射（防止路径被当成静态文件找）
+            add-mappings: false
+        # Spring Boot 3+/Spring Framework 6 已废弃该配置，不再需要手动设置
+        # 若需要处理 404/NoHandlerFoundException，请在全局异常处理器中处理
 # MyBatis-Plus 配置
 mybatis-plus:
     configuration:
