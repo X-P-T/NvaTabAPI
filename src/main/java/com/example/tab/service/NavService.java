@@ -2,16 +2,21 @@ package com.example.tab.service;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.tab.exception.BusinessException;
 import com.example.tab.mapper.CategoryMapper;
 import com.example.tab.mapper.SiteMapper;
+import com.example.tab.model.dto.CategoryDTO;
+import com.example.tab.model.dto.SiteDTO;
 import com.example.tab.model.entity.Category;
 import com.example.tab.model.entity.Site;
 import com.example.tab.model.vo.CategoryWithSitesVO;
+import com.example.tab.util.PermissionUtils;
+
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,78 +31,161 @@ public class NavService {
     @Autowired
     private SiteMapper siteMapper;
 
+    // ------------------- 分类管理 -------------------
+
     /**
-     * 新增分类（自动绑定当前登录的用户）
+     * 新增分类
+     * 仅教师和超级管理员允许
      */
-    public boolean addCategory(Category category) {
+    public void addCategory(CategoryDTO dto) {
+        PermissionUtils.checkTeacherOrAdmin();
+
         Long currentUserId = StpUtil.getLoginIdAsLong();
+
+        Category category = new Category();
+        category.setName(dto.getName());
+        category.setSortOrder(dto.getSort() != null ? dto.getSort() : 0);
         category.setUserId(currentUserId);
 
-        if (category.getSortOrder() == null) category.setSortOrder(0);
-        if (category.getIsPublic() == null) category.setIsPublic(1); // 默认公开
-        if (category.getCreateTime() == null) category.setCreateTime(LocalDateTime.now());
-
-        return categoryMapper.insert(category) > 0;
+        categoryMapper.insert(category);
     }
 
-    /**
-     * 删除分类（防越权校验）
-     */
-    public boolean deleteCategory(Long categoryId) {
-        Category category = categoryMapper.selectById(categoryId);
+    // 修改分类
+    public void updateCategory(CategoryDTO dto) {
+        if (dto.getId() == null) {
+            throw new RuntimeException("分类ID不能为空");
+        }
+        Category category = categoryMapper.selectById(dto.getId());
         if (category == null) {
             throw new RuntimeException("分类不存在");
         }
 
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        if (!category.getUserId().equals(currentUserId)) {
-            throw new RuntimeException("无权删除他人的分类");
+        // 鉴权：SUPER_ADMIN 权限放行 或 只能修改属于自己的分类
+        PermissionUtils.checkOwnerOrAdmin(category.getUserId());
+
+        category.setName(dto.getName());
+        if (dto.getSort() != null) {
+            category.setSortOrder(dto.getSort());
+        }
+        categoryMapper.updateById(category);
+    }
+
+    /**
+     * 删除分类及其下属网址
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteCategory(Long categoryId) {
+        Category category = categoryMapper.selectById(categoryId);
+
+        if (category == null) {
+            throw new RuntimeException("分类不存在");
         }
 
-        return categoryMapper.deleteById(categoryId) > 0;
+        PermissionUtils.checkOwnerOrAdmin(category.getUserId());
+
+        LambdaQueryWrapper<Site> siteQuery = new LambdaQueryWrapper<>();
+        siteQuery.eq(Site::getCategoryId, categoryId);
+
+        siteMapper.delete(siteQuery);
+        categoryMapper.deleteById(categoryId);
     }
 
+    // ------------------- 网址书签管理 -------------------
+
     /**
-     * 新增网址（自动绑定当前登录的用户）
+     * 新增网址
+     * 仅教师和超级管理员允许
      */
-    public boolean addSite(Site site) {
+    public void addSite(SiteDTO dto) {
+        PermissionUtils.checkTeacherOrAdmin();
+
         Long currentUserId = StpUtil.getLoginIdAsLong();
+
+        // 校验分类是否存在且属于当前用户
+        Category category = categoryMapper.selectById(dto.getCategoryId());
+
+        if (category == null) {
+            throw new RuntimeException("分类不存在");
+        }
+
+        if (!PermissionUtils.isSuperAdmin()
+                && !currentUserId.equals(category.getUserId())) {
+            throw new RuntimeException("不能在他人的分类下创建网址");
+        }
+
+        Site site = new Site();
+        site.setTitle(dto.getTitle());
+        site.setUrl(dto.getUrl());
+        site.setIconUrl(dto.getIcon());
+        site.setDescription(dto.getDescription());
+        site.setCategoryId(dto.getCategoryId());
+        site.setSortOrder(dto.getSort() != null ? dto.getSort() : 0);
+        site.setClickCount(0);
         site.setUserId(currentUserId);
 
-        if (site.getSortOrder() == null) site.setSortOrder(0);
-        if (site.getClickCount() == null) site.setClickCount(0);
-        if (site.getStatus() == null) site.setStatus(1);
-        if (site.getCreateTime() == null) site.setCreateTime(LocalDateTime.now());
-
-        return siteMapper.insert(site) > 0;
+        siteMapper.insert(site);
     }
 
-    /**
-     * 删除网址（防越权校验）
-     */
-    public boolean deleteSite(Long siteId) {
+    // 修改网址
+    public void updateSite(SiteDTO dto) {
+        if (dto.getId() == null) {
+            throw new RuntimeException("网址ID不能为空");
+        }
+        Site site = siteMapper.selectById(dto.getId());
+        if (site == null) {
+            throw BusinessException.notFound("网址不存在");
+        }
+
+        // 校验目标分类
+        Category category = categoryMapper.selectById(dto.getCategoryId());
+
+        if (category == null) {
+            throw new RuntimeException("目标分类不存在");
+        }
+
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!PermissionUtils.isSuperAdmin()
+                && !currentUserId.equals(category.getUserId())) {
+            throw new RuntimeException("不能将网址移动到他人的分类");
+        }
+
+        // 鉴权：SUPER_ADMIN 权限放行 或 只能修改属于自己的网址
+        PermissionUtils.checkOwnerOrAdmin(site.getUserId());
+
+        site.setTitle(dto.getTitle());
+        site.setUrl(dto.getUrl());
+        site.setIconUrl(dto.getIcon());
+        site.setDescription(dto.getDescription());
+        site.setCategoryId(dto.getCategoryId());
+        if (dto.getSort() != null) {
+            site.setSortOrder(dto.getSort());
+        }
+        siteMapper.updateById(site);
+    }
+
+    // 删除网址
+    public void deleteSite(Long siteId) {
         Site site = siteMapper.selectById(siteId);
         if (site == null) {
             throw new RuntimeException("网址不存在");
         }
 
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        if (!site.getUserId().equals(currentUserId)) {
-            throw new RuntimeException("无权删除他人的网址");
-        }
+        // 鉴权：SUPER_ADMIN 权限放行 或 只能删除属于自己的网址
+        PermissionUtils.checkOwnerOrAdmin(site.getUserId());
 
-        return siteMapper.deleteById(siteId) > 0;
+        siteMapper.deleteById(siteId);
     }
 
     /**
      * 获取全量或指定创作者的导航树结构
+     * 
      * @param targetUserId 可选参数，传值时只查指定用户的书签；不传则查全站公开书签
      */
     public List<CategoryWithSitesVO> getNavTree(Long targetUserId) {
         // 1. 查询公开的分类
         LambdaQueryWrapper<Category> categoryQuery = new LambdaQueryWrapper<>();
         categoryQuery.eq(Category::getIsPublic, 1)
-                     .orderByAsc(Category::getSortOrder);
+                .orderByAsc(Category::getSortOrder);
 
         if (targetUserId != null) {
             categoryQuery.eq(Category::getUserId, targetUserId);
@@ -111,7 +199,7 @@ public class NavService {
         // 2. 查询正常可用的网址
         LambdaQueryWrapper<Site> siteQuery = new LambdaQueryWrapper<>();
         siteQuery.eq(Site::getStatus, 1)
-                 .orderByAsc(Site::getSortOrder);
+                .orderByAsc(Site::getSortOrder);
 
         if (targetUserId != null) {
             siteQuery.eq(Site::getUserId, targetUserId);
@@ -143,4 +231,5 @@ public class NavService {
             siteMapper.updateById(site);
         }
     }
+
 }

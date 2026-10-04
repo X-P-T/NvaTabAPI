@@ -24,5 +24,7 @@ public class User {
 
     private Integer status;
 
+    private String role;
+
     private LocalDateTime createTime;
 }

@@ -2,6 +2,8 @@ package com.example.tab.controller;
 
 import com.example.tab.model.entity.Category;
 import com.example.tab.model.entity.Site;
+import com.example.tab.model.dto.CategoryDTO;
+import com.example.tab.model.dto.SiteDTO;
 import com.example.tab.model.vo.CategoryWithSitesVO;
 import com.example.tab.service.NavService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,38 +28,44 @@ public class NavController {
         return navService.getNavTree(userId);
     }
 
-    /**
-     * 新增分类 (需携带 Token 认证)
-     */
+    // 新增分类
     @PostMapping("/category")
-    public String addCategory(@RequestBody Category category) {
-        navService.addCategory(category);
+    public String addCategory(@RequestBody CategoryDTO dto) {
+        navService.addCategory(dto);
         return "新增分类成功";
     }
 
-    /**
-     * 删除分类 (需携带 Token 认证且必须是自己的数据)
-     */
+    // 修改分类
+    @PutMapping("/category")
+    public String updateCategory(@RequestBody CategoryDTO dto) {
+        navService.updateCategory(dto);
+        return "修改分类成功";
+    }
+
+    // 删除分类
     @DeleteMapping("/category/{id}")
-    public String deleteCategory(@PathVariable Long id) {
+    public String deleteCategory(@PathVariable("id") Long id) {
         navService.deleteCategory(id);
         return "删除分类成功";
     }
 
-    /**
-     * 新增网址 (需携带 Token 认证)
-     */
+    // 新增网址
     @PostMapping("/site")
-    public String addSite(@RequestBody Site site) {
-        navService.addSite(site);
+    public String addSite(@RequestBody SiteDTO dto) {
+        navService.addSite(dto);
         return "新增网址成功";
     }
 
-    /**
-     * 删除网址 (需携带 Token 认证且必须是自己的数据)
-     */
+    // 修改网址
+    @PutMapping("/site")
+    public String updateSite(@RequestBody SiteDTO dto) {
+        navService.updateSite(dto);
+        return "修改网址成功";
+    }
+
+    // 删除网址
     @DeleteMapping("/site/{id}")
-    public String deleteSite(@PathVariable Long id) {
+    public String deleteSite(@PathVariable("id") Long id) {
         navService.deleteSite(id);
         return "删除网址成功";
     }

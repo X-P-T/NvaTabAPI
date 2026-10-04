@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.tab.mapper.UserMapper;
 import com.example.tab.model.dto.AuthDTO;
 import com.example.tab.model.entity.User;
+import com.example.tab.util.PermissionUtils;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,20 +25,28 @@ public class UserService {
     private BCryptPasswordEncoder passwordEncoder;
 
     /**
-     * 用户注册（BCrypt 密码加密存储）
+     * 用户注册
+     * 所有自主注册账号默认是学生
      */
     public void register(AuthDTO dto) {
         LambdaQueryWrapper<User> query = new LambdaQueryWrapper<>();
         query.eq(User::getUsername, dto.getUsername());
+
         if (userMapper.selectCount(query) > 0) {
             throw new RuntimeException("用户名已存在");
         }
 
         User user = new User();
         user.setUsername(dto.getUsername());
-        // 使用 BCrypt 对原始密码进行哈希加密
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
-        user.setNickname(dto.getNickname() != null ? dto.getNickname() : dto.getUsername());
+        user.setNickname(
+                dto.getNickname() != null
+                        ? dto.getNickname()
+                        : dto.getUsername());
+
+        // 关键：角色由后端指定，忽略客户端传来的角色
+        user.setRole(PermissionUtils.ROLE_STUDENT);
+
         user.setStatus(1);
         user.setCreateTime(LocalDateTime.now());
 
@@ -51,22 +61,36 @@ public class UserService {
         query.eq(User::getUsername, dto.getUsername());
         User user = userMapper.selectOne(query);
 
-        if (user == null || !passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+        // 进行 trim() 处理防隐形空格，校验用户与密码
+        String rawPassword = dto.getPassword() != null ? dto.getPassword().trim() : "";
+        if (user == null || !passwordEncoder.matches(rawPassword, user.getPassword().trim())) {
             throw new RuntimeException("用户名或密码错误");
         }
 
-        if (user.getStatus() != 1) {
+        if (user.getStatus() == null || user.getStatus() != 1) {
             throw new RuntimeException("账号已被冻结");
         }
 
-        StpUtil.login(user.getId());
+        String role = user.getRole();
 
+        if (!PermissionUtils.ROLE_SUPER_ADMIN.equals(role)
+                && !PermissionUtils.ROLE_TEACHER.equals(role)
+                && !PermissionUtils.ROLE_STUDENT.equals(role)) {
+            throw new RuntimeException("账号角色异常，请联系管理员");
+        }
+
+        // Sa-Token 登录与 Session 缓存角色
+        StpUtil.login(user.getId());
+        StpUtil.getSession().set("role", user.getRole());
+
+        // 封装返回结果
         Map<String, Object> result = new HashMap<>();
         result.put("tokenName", StpUtil.getTokenName());
         result.put("tokenValue", StpUtil.getTokenValue());
         result.put("userId", user.getId());
         result.put("username", user.getUsername());
         result.put("nickname", user.getNickname());
+        result.put("role", user.getRole());
 
         return result;
     }

@@ -37,4 +37,5 @@ public class AuthController {
     public User getUserInfo() {
         return userService.getCurrentUserInfo();
     }
+    
 }

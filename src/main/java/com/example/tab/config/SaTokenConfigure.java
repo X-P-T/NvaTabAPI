@@ -1,3 +1,4 @@
+
 package com.example.tab.config;
 
 import cn.dev33.satoken.interceptor.SaInterceptor;
@@ -11,15 +12,14 @@ public class SaTokenConfigure implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 注册 Sa-Token 拦截器，打开注解式鉴权功能
-        registry.addInterceptor(new SaInterceptor(handle -> StpUtil.checkLogin()))
+
+        registry.addInterceptor(
+                new SaInterceptor(handle -> StpUtil.checkLogin()))
                 .addPathPatterns("/api/**")
-                // 放行登录注册以及公开的导航查询接口
                 .excludePathPatterns(
                         "/api/auth/login",
                         "/api/auth/register",
                         "/api/nav/tree",
-                        "/api/nav/site/click/*"
-                );
+                        "/api/nav/site/click/*");
     }
 }
