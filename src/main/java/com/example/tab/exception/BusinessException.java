@@ -17,6 +17,10 @@ public class BusinessException extends RuntimeException {
         return new BusinessException(403, message);
     }
 
+    public static BusinessException unauthorized(String message) {
+        return new BusinessException(401, message);
+    }
+
     public static BusinessException badRequest(String message) {
         return new BusinessException(400, message);
     }

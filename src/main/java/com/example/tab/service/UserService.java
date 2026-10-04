@@ -1,15 +1,19 @@
 package com.example.tab.service;
 
 import cn.dev33.satoken.stp.StpUtil;
+import jakarta.validation.Valid;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.tab.mapper.UserMapper;
 import com.example.tab.model.dto.AuthDTO;
 import com.example.tab.model.entity.User;
 import com.example.tab.util.PermissionUtils;
+import com.example.tab.exception.BusinessException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -28,19 +32,19 @@ public class UserService {
      * 用户注册
      * 所有自主注册账号默认是学生
      */
-    public void register(AuthDTO dto) {
+    public void register(@Valid @RequestBody AuthDTO dto) {
         LambdaQueryWrapper<User> query = new LambdaQueryWrapper<>();
         query.eq(User::getUsername, dto.getUsername());
 
         if (userMapper.selectCount(query) > 0) {
-            throw new RuntimeException("用户名已存在");
+            throw new BusinessException(400, "用户名已存在");
         }
 
         User user = new User();
         user.setUsername(dto.getUsername());
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
         user.setNickname(
-                dto.getNickname() != null
+                dto.getNickname() != null && !dto.getNickname().isBlank()
                         ? dto.getNickname()
                         : dto.getUsername());
 
@@ -64,11 +68,11 @@ public class UserService {
         // 进行 trim() 处理防隐形空格，校验用户与密码
         String rawPassword = dto.getPassword() != null ? dto.getPassword().trim() : "";
         if (user == null || !passwordEncoder.matches(rawPassword, user.getPassword().trim())) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BusinessException(401, "用户名或密码错误");
         }
 
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new RuntimeException("账号已被冻结");
+            throw new BusinessException(403, "账号已被冻结");
         }
 
         String role = user.getRole();
@@ -76,7 +80,7 @@ public class UserService {
         if (!PermissionUtils.ROLE_SUPER_ADMIN.equals(role)
                 && !PermissionUtils.ROLE_TEACHER.equals(role)
                 && !PermissionUtils.ROLE_STUDENT.equals(role)) {
-            throw new RuntimeException("账号角色异常，请联系管理员");
+            throw new BusinessException(500, "账号角色异常，请联系管理员");
         }
 
         // Sa-Token 登录与 Session 缓存角色

@@ -9,6 +9,7 @@ import com.example.tab.model.dto.CategoryDTO;
 import com.example.tab.model.dto.SiteDTO;
 import com.example.tab.model.entity.Category;
 import com.example.tab.model.entity.Site;
+import com.example.tab.model.vo.CategoryVO;
 import com.example.tab.model.vo.CategoryWithSitesVO;
 import com.example.tab.util.PermissionUtils;
 
@@ -37,10 +38,22 @@ public class NavService {
      * 新增分类
      * 仅教师和超级管理员允许
      */
-    public void addCategory(CategoryDTO dto) {
+    public CategoryVO addCategory(CategoryDTO dto) {
         PermissionUtils.checkTeacherOrAdmin();
 
         Long currentUserId = StpUtil.getLoginIdAsLong();
+
+        // 检查当前用户是否已经存在同名分类
+        LambdaQueryWrapper<Category> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper
+                .eq(Category::getName, dto.getName())
+                .eq(Category::getUserId, currentUserId);
+
+        Category existingCategory = categoryMapper.selectOne(queryWrapper);
+
+        if (existingCategory != null) {
+            throw BusinessException.badRequest("分类名称已存在");
+        }
 
         Category category = new Category();
         category.setName(dto.getName());
@@ -48,16 +61,24 @@ public class NavService {
         category.setUserId(currentUserId);
 
         categoryMapper.insert(category);
+
+        CategoryVO vo = new CategoryVO();
+        vo.setId(category.getId());
+        vo.setName(category.getName());
+        vo.setSort(category.getSortOrder());
+        vo.setUserId(category.getUserId());
+
+        return vo;
     }
 
     // 修改分类
     public void updateCategory(CategoryDTO dto) {
         if (dto.getId() == null) {
-            throw new RuntimeException("分类ID不能为空");
+            throw new BusinessException(400, "分类ID不能为空");
         }
         Category category = categoryMapper.selectById(dto.getId());
         if (category == null) {
-            throw new RuntimeException("分类不存在");
+            throw new BusinessException(404, "分类不存在");
         }
 
         // 鉴权：SUPER_ADMIN 权限放行 或 只能修改属于自己的分类
@@ -75,18 +96,34 @@ public class NavService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteCategory(Long categoryId) {
+        if (categoryId == null) {
+            throw new BusinessException(400, "分类ID不能为空");
+        }
         Category category = categoryMapper.selectById(categoryId);
 
         if (category == null) {
-            throw new RuntimeException("分类不存在");
+            throw new BusinessException(404, "分类不存在");
         }
 
         PermissionUtils.checkOwnerOrAdmin(category.getUserId());
 
+        // 查询分类下的所有网址
         LambdaQueryWrapper<Site> siteQuery = new LambdaQueryWrapper<>();
         siteQuery.eq(Site::getCategoryId, categoryId);
 
-        siteMapper.delete(siteQuery);
+        List<Site> sites = siteMapper.selectList(siteQuery);
+
+        // 校验每个网址的归属
+        for (Site site : sites) {
+            PermissionUtils.checkOwnerOrAdmin(site.getUserId());
+        }
+
+        // 删除下属网址
+        if (!sites.isEmpty()) {
+            siteMapper.delete(siteQuery);
+        }
+
+        // 删除分类
         categoryMapper.deleteById(categoryId);
     }
 
@@ -97,6 +134,9 @@ public class NavService {
      * 仅教师和超级管理员允许
      */
     public void addSite(SiteDTO dto) {
+        if (dto.getCategoryId() == null) {
+            throw new BusinessException(400, "分类ID不能为空");
+        }
         PermissionUtils.checkTeacherOrAdmin();
 
         Long currentUserId = StpUtil.getLoginIdAsLong();
@@ -105,12 +145,12 @@ public class NavService {
         Category category = categoryMapper.selectById(dto.getCategoryId());
 
         if (category == null) {
-            throw new RuntimeException("分类不存在");
+            throw new BusinessException(404, "分类不存在");
         }
 
         if (!PermissionUtils.isSuperAdmin()
                 && !currentUserId.equals(category.getUserId())) {
-            throw new RuntimeException("不能在他人的分类下创建网址");
+            throw new BusinessException(403, "无权在他人的分类下创建网址");
         }
 
         Site site = new Site();
@@ -129,45 +169,59 @@ public class NavService {
     // 修改网址
     public void updateSite(SiteDTO dto) {
         if (dto.getId() == null) {
-            throw new RuntimeException("网址ID不能为空");
+            throw new BusinessException(400, "网址ID不能为空");
         }
+
         Site site = siteMapper.selectById(dto.getId());
+
         if (site == null) {
             throw BusinessException.notFound("网址不存在");
         }
 
-        // 校验目标分类
+        // 先检查原网址归属
+        PermissionUtils.checkOwnerOrAdmin(site.getUserId());
+
+        if (dto.getCategoryId() == null) {
+            throw new BusinessException(400, "目标分类ID不能为空");
+        }
+
+        // 再检查目标分类
         Category category = categoryMapper.selectById(dto.getCategoryId());
 
         if (category == null) {
-            throw new RuntimeException("目标分类不存在");
+            throw BusinessException.notFound("目标分类不存在");
         }
 
         Long currentUserId = StpUtil.getLoginIdAsLong();
+
         if (!PermissionUtils.isSuperAdmin()
                 && !currentUserId.equals(category.getUserId())) {
-            throw new RuntimeException("不能将网址移动到他人的分类");
+            throw BusinessException.forbidden(
+                    "不能将网址移动到他人的分类");
         }
 
-        // 鉴权：SUPER_ADMIN 权限放行 或 只能修改属于自己的网址
-        PermissionUtils.checkOwnerOrAdmin(site.getUserId());
-
+        // 后续更新逻辑保留
         site.setTitle(dto.getTitle());
         site.setUrl(dto.getUrl());
         site.setIconUrl(dto.getIcon());
         site.setDescription(dto.getDescription());
         site.setCategoryId(dto.getCategoryId());
+
         if (dto.getSort() != null) {
             site.setSortOrder(dto.getSort());
         }
+
         siteMapper.updateById(site);
     }
 
     // 删除网址
     public void deleteSite(Long siteId) {
+        if (siteId == null) {
+            throw new BusinessException(400, "网址ID不能为空");
+        }
         Site site = siteMapper.selectById(siteId);
         if (site == null) {
-            throw new RuntimeException("网址不存在");
+            throw BusinessException.notFound("网址不存在");
         }
 
         // 鉴权：SUPER_ADMIN 权限放行 或 只能删除属于自己的网址
@@ -225,11 +279,7 @@ public class NavService {
      * 网址点击量自增 (+1，所有人可操作)
      */
     public void incrementClick(Long siteId) {
-        Site site = siteMapper.selectById(siteId);
-        if (site != null) {
-            site.setClickCount((site.getClickCount() == null ? 0 : site.getClickCount()) + 1);
-            siteMapper.updateById(site);
-        }
+        siteMapper.incrementClick(siteId);
     }
 
 }

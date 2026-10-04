@@ -2,6 +2,7 @@
 package com.example.tab.util;
 
 import com.example.tab.exception.BusinessException;
+import com.example.tab.exception.BusinessException;
 
 import cn.dev33.satoken.stp.StpUtil;
 
@@ -16,12 +17,12 @@ public class PermissionUtils {
      */
     public static String getCurrentRole() {
         if (!StpUtil.isLogin()) {
-            throw new RuntimeException("请先登录");
+            throw new BusinessException(401, "请先登录");
         }
 
         Object role = StpUtil.getSession().get("role");
         if (role == null) {
-            throw new RuntimeException("用户角色信息不存在，请重新登录");
+            throw new BusinessException(500, "用户角色信息不存在，请重新登录");
         }
         return role.toString();
     }
@@ -54,7 +55,7 @@ public class PermissionUtils {
      */
     public static void checkTeacherOrAdmin() {
         if (!isTeacherOrAbove()) {
-            throw BusinessException.forbidden("权限不足，仅教师或超级管理员可以操作");
+            throw new BusinessException(403, "权限不足，仅教师或超级管理员可以操作");
         }
     }
 
@@ -70,8 +71,7 @@ public class PermissionUtils {
      */
     public static void checkStudent() {
         if (!isStudent()) {
-            throw BusinessException.forbidden(
-                    "权限不足，仅学生可以操作");
+            throw new BusinessException(403, "权限不足，仅学生可以操作");
         }
     }
 
@@ -90,8 +90,7 @@ public class PermissionUtils {
         }
 
         if (ownerUserId == null || !ownerUserId.equals(currentUserId)) {
-            throw BusinessException.forbidden(
-                    "无权操作他人创建的资源");
+            throw new BusinessException(403, "无权操作他人创建的资源");
         }
     }
 }

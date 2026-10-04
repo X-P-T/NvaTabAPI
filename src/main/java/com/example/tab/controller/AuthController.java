@@ -1,9 +1,12 @@
 package com.example.tab.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
+import jakarta.validation.Valid;
+
 import com.example.tab.model.dto.AuthDTO;
 import com.example.tab.model.entity.User;
 import com.example.tab.service.UserService;
+import com.example.tab.common.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,25 +20,25 @@ public class AuthController {
     private UserService userService;
 
     @PostMapping("/register")
-    public String register(@RequestBody AuthDTO dto) {
+    public Result<Void> register(@Valid @RequestBody AuthDTO dto) {
         userService.register(dto);
-        return "注册成功";
+        return Result.success("注册成功", null);
     }
 
     @PostMapping("/login")
-    public Map<String, Object> login(@RequestBody AuthDTO dto) {
-        return userService.login(dto);
+    public Result<Map<String, Object>> login(@RequestBody AuthDTO dto) {
+        return Result.success(userService.login(dto));
     }
 
     @PostMapping("/logout")
-    public String logout() {
+    public Result<Void> logout() {
         StpUtil.logout();
-        return "登出成功";
+        return Result.success("登出成功", null);
     }
 
     @GetMapping("/info")
     public User getUserInfo() {
         return userService.getCurrentUserInfo();
     }
-    
+
 }
