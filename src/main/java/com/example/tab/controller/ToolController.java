@@ -2,17 +2,28 @@ package com.example.tab.controller;
 
 import com.example.tab.model.dto.SiteMetadataDTO;
 import com.example.tab.util.WebMetadataUtil;
-import org.springframework.web.bind.annotation.*;
+import jakarta.validation.constraints.NotBlank;
+import lombok.RequiredArgsConstructor;
 
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+// import org.springframework.data.redis.core.StringRedisTemplate;
+
+/**
+ * 自动解析网站元数据接口
+ * ToolController
+ */
 @RestController
 @RequestMapping("/api/tool")
+@Validated
+@RequiredArgsConstructor
 public class ToolController {
-    /**
-     * 自动解析网站元数据接口
-     * 示例: GET /api/tool/parse-site?url=https://github.com
-     */
+
     @GetMapping("/parse-site")
-    public SiteMetadataDTO parseSite(@RequestParam("url") String url) {
-        return WebMetadataUtil.parseMetadata(url);
+    public SiteMetadataDTO parseSite(
+            @RequestParam("url") @NotBlank(message = "网址不能为空") String url) {
+
+        return WebMetadataUtil.parseMetadata(url.trim());
     }
+
 }

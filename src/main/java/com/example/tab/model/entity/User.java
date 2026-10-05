@@ -27,4 +27,10 @@ public class User {
     private String role;
 
     private LocalDateTime createTime;
+
+    private Integer mustChangePassword;
+
+    private String email;
+
+    private Integer emailVerified;
 }

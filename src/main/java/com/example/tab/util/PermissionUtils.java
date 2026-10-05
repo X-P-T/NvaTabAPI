@@ -2,7 +2,6 @@
 package com.example.tab.util;
 
 import com.example.tab.exception.BusinessException;
-import com.example.tab.exception.BusinessException;
 
 import cn.dev33.satoken.stp.StpUtil;
 
@@ -32,6 +31,15 @@ public class PermissionUtils {
      */
     public static boolean isSuperAdmin() {
         return ROLE_SUPER_ADMIN.equals(getCurrentRole());
+    }
+
+    /**
+     * 仅允许超级管理员操作
+     */
+    public static void checkSuperAdmin() {
+        if (!isSuperAdmin()) {
+            throw new BusinessException(403, "权限不足，仅超级管理员可以操作");
+        }
     }
 
     /**

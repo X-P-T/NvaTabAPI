@@ -6,7 +6,8 @@ import com.example.tab.exception.BusinessException;
 import com.example.tab.mapper.CategoryMapper;
 import com.example.tab.mapper.SiteMapper;
 import com.example.tab.model.dto.CategoryDTO;
-import com.example.tab.model.dto.SiteDTO;
+import com.example.tab.model.dto.SiteAddDTO;
+import com.example.tab.model.dto.SiteUpdateDTO;
 import com.example.tab.model.entity.Category;
 import com.example.tab.model.entity.Site;
 import com.example.tab.model.vo.CategoryVO;
@@ -14,7 +15,6 @@ import com.example.tab.model.vo.CategoryWithSitesVO;
 import com.example.tab.util.PermissionUtils;
 
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,14 +23,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class NavService {
 
-    @Autowired
-    private CategoryMapper categoryMapper;
+    private final CategoryMapper categoryMapper;
 
-    @Autowired
-    private SiteMapper siteMapper;
+    private final SiteMapper siteMapper;
 
     // ------------------- 分类管理 -------------------
 
@@ -131,29 +132,31 @@ public class NavService {
 
     /**
      * 新增网址
-     * 仅教师和超级管理员允许
      */
-    public void addSite(SiteDTO dto) {
-        if (dto.getCategoryId() == null) {
-            throw new BusinessException(400, "分类ID不能为空");
-        }
+    public void addSite(SiteAddDTO dto) {
+
         PermissionUtils.checkTeacherOrAdmin();
 
         Long currentUserId = StpUtil.getLoginIdAsLong();
 
-        // 校验分类是否存在且属于当前用户
+        // 检查分类是否存在
         Category category = categoryMapper.selectById(dto.getCategoryId());
 
         if (category == null) {
             throw new BusinessException(404, "分类不存在");
         }
 
+        // 检查分类归属
         if (!PermissionUtils.isSuperAdmin()
                 && !currentUserId.equals(category.getUserId())) {
-            throw new BusinessException(403, "无权在他人的分类下创建网址");
+
+            throw new BusinessException(
+                    403,
+                    "无权在他人的分类下创建网址");
         }
 
         Site site = new Site();
+
         site.setTitle(dto.getTitle());
         site.setUrl(dto.getUrl());
         site.setIconUrl(dto.getIcon());
@@ -166,8 +169,12 @@ public class NavService {
         siteMapper.insert(site);
     }
 
-    // 修改网址
-    public void updateSite(SiteDTO dto) {
+    /**
+     * 修改网址
+     * 支持部分字段修改
+     */
+    public void updateSite(SiteUpdateDTO dto) {
+
         if (dto.getId() == null) {
             throw new BusinessException(400, "网址ID不能为空");
         }
@@ -178,43 +185,61 @@ public class NavService {
             throw BusinessException.notFound("网址不存在");
         }
 
-        // 先检查原网址归属
+        // 检查原网址归属
         PermissionUtils.checkOwnerOrAdmin(site.getUserId());
 
-        if (dto.getCategoryId() == null) {
-            throw new BusinessException(400, "目标分类ID不能为空");
+        // 修改标题
+        if (dto.getTitle() != null) {
+            site.setTitle(dto.getTitle());
         }
 
-        // 再检查目标分类
-        Category category = categoryMapper.selectById(dto.getCategoryId());
-
-        if (category == null) {
-            throw BusinessException.notFound("目标分类不存在");
+        // 修改 URL
+        if (dto.getUrl() != null) {
+            site.setUrl(dto.getUrl());
         }
 
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-
-        if (!PermissionUtils.isSuperAdmin()
-                && !currentUserId.equals(category.getUserId())) {
-            throw BusinessException.forbidden(
-                    "不能将网址移动到他人的分类");
+        // 修改图标
+        if (dto.getIcon() != null) {
+            site.setIconUrl(dto.getIcon());
         }
 
-        // 后续更新逻辑保留
-        site.setTitle(dto.getTitle());
-        site.setUrl(dto.getUrl());
-        site.setIconUrl(dto.getIcon());
-        site.setDescription(dto.getDescription());
-        site.setCategoryId(dto.getCategoryId());
+        // 修改描述
+        if (dto.getDescription() != null) {
+            site.setDescription(dto.getDescription());
+        }
 
+        // 修改排序
         if (dto.getSort() != null) {
             site.setSortOrder(dto.getSort());
+        }
+
+        // 修改分类
+        if (dto.getCategoryId() != null) {
+
+            Category category = categoryMapper.selectById(dto.getCategoryId());
+
+            if (category == null) {
+                throw BusinessException.notFound("目标分类不存在");
+            }
+
+            Long currentUserId = StpUtil.getLoginIdAsLong();
+
+            if (!PermissionUtils.isSuperAdmin()
+                    && !currentUserId.equals(category.getUserId())) {
+
+                throw BusinessException.forbidden(
+                        "不能将网址移动到他人的分类");
+            }
+
+            site.setCategoryId(dto.getCategoryId());
         }
 
         siteMapper.updateById(site);
     }
 
-    // 删除网址
+    /**
+     * 删除网址
+     */
     public void deleteSite(Long siteId) {
         if (siteId == null) {
             throw new BusinessException(400, "网址ID不能为空");
@@ -279,7 +304,16 @@ public class NavService {
      * 网址点击量自增 (+1，所有人可操作)
      */
     public void incrementClick(Long siteId) {
-        siteMapper.incrementClick(siteId);
+
+        if (siteId == null) {
+            throw BusinessException.badRequest("网址ID不能为空");
+        }
+
+        int affectedRows = siteMapper.incrementClick(siteId);
+
+        if (affectedRows == 0) {
+            throw BusinessException.notFound("网址不存在");
+        }
     }
 
 }

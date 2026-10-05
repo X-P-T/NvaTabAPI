@@ -1,26 +1,17 @@
-package com.example.tab.model.entity;
+package com.example.tab.model.vo;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
-@TableName("sys_announcement")
-public class Announcement {
+public class AnnouncementVO {
 
     /**
      * 公告ID
      */
-    @TableId(type = IdType.AUTO)
     private Long id;
-
-    /**
-     * 发布人ID
-     */
-    private Long userId;
 
     /**
      * 公告标题
@@ -61,4 +52,14 @@ public class Announcement {
      * 更新时间
      */
     private LocalDateTime updateTime;
+
+    /**
+     * 发布人信息
+     */
+    private PublisherVO publisher;
+
+    /**
+     * 公告图片
+     */
+    private List<AnnouncementImageVO> images;
 }

@@ -17,6 +17,26 @@ spring:
             add-mappings: false
         # Spring Boot 3+/Spring Framework 6 已废弃该配置，不再需要手动设置
         # 若需要处理 404/NoHandlerFoundException，请在全局异常处理器中处理
+    
+    mail:
+      host: smtp.qq.com
+      port: 587
+      username: 2889541533@qq.com
+      password: zunseyqhhplmdggc
+      protocol: smtp
+      properties:
+        mail:
+          smtp:
+            auth: true
+            starttls:
+              enable: true
+              required: true
+    data:
+        redis:
+            host: localhost
+            port: 6379
+file:
+  upload-dir: ./uploads
 # MyBatis-Plus 配置
 mybatis-plus:
     configuration:
@@ -38,3 +58,5 @@ sa-token:
     is-read-cookie: false
     # 是否控制台打印 log
     is-log: true
+
+
