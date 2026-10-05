@@ -68,6 +68,8 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                         "/api/auth/register",
                         "/api/auth/forgot-password/send-code",
                         "/api/auth/forgot-password/reset",
+                        "/api/resource/list",
+                        "/api/resource/*",
                         "/api/nav/tree",
                         "/api/nav/site/click/*");
     }
